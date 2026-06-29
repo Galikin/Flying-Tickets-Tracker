@@ -1,6 +1,6 @@
 {
   "name": "Flying Tickets Tracker",
-  "short_name": "Tickets",
+  "short_name": "Flying Tickets",
   "description": "Score tracker for Flying Tickets arcade game",
   "start_url": "./",
   "display": "standalone",
