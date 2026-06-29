@@ -2,7 +2,7 @@
   "name": "Flying Tickets Tracker",
   "short_name": "Tickets",
   "description": "Score tracker for Flying Tickets arcade game",
-  "start_url": "./flying_tickets_tracker.html",
+  "start_url": "./",
   "display": "standalone",
   "scope": "./",
   "background_color": "#0d0d1a",
