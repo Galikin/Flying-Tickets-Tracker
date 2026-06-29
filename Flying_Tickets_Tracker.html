@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffd700">
+<link rel="manifest" href="manifest.json">
+<title>Flying Tickets Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d0d1a;
+    color: #fff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 20px 16px 60px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .header { text-align: center; margin-bottom: 24px; }
+  .header .bird { font-size: 48px; margin-bottom: 6px; }
+  .header h1 {
+    font-size: 26px; font-weight: 900; letter-spacing: 3px;
+    color: #ffd700; text-shadow: 0 0 28px #ffd70088;
+  }
+  .header p { font-size: 12px; color: #555; margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Jackpot banner */
+  .jackpot-banner {
+    background: linear-gradient(135deg, #1a1000, #2a1f00);
+    border: 1px solid #ffd70066;
+    border-radius: 14px;
+    padding: 14px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .jackpot-pct {
+    font-size: 42px; font-weight: 900; color: #ffd700;
+    text-shadow: 0 0 20px #ffd70066; line-height: 1;
+  }
+  .jackpot-right { text-align: right; }
+  .jackpot-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .jackpot-counts { font-size: 13px; color: #ffd70099; }
+  .jackpot-streak { font-size: 11px; color: #ff9500; margin-top: 4px; }
+
+  /* Stats row */
+  .stats { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+  .stat {
+    background: #16213e; border-radius: 12px; padding: 12px 10px;
+    text-align: center; flex: 1; border: 1px solid transparent;
+  }
+  .stat.gold { border-color: #ffd70044; }
+  .stat.blue { border-color: #7ec8e344; }
+  .stat.green { border-color: #a8e6cf44; }
+  .stat .val { font-size: 22px; font-weight: 900; }
+  .stat.gold .val { color: #ffd700; }
+  .stat.blue .val { color: #7ec8e3; }
+  .stat.green .val { color: #a8e6cf; }
+  .stat .lbl { font-size: 9px; color: #555; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Upload */
+  .upload-box {
+    background: #16213e; border-radius: 14px; padding: 20px;
+    margin-bottom: 20px; border: 1px solid #ffd70033; text-align: center;
+  }
+  .upload-btn-row {
+    display: flex; gap: 10px; width: 100%;
+  }
+  .upload-btn {
+    display: inline-block; background: #ffd700; color: #0d0d1a;
+    font-weight: 900; font-size: 16px; padding: 14px 20px;
+    border-radius: 12px; cursor: pointer; letter-spacing: 0.5px;
+    -webkit-tap-highlight-color: transparent; border: none;
+    flex: 1; transition: opacity 0.15s;
+  }
+  .upload-btn:active { opacity: 0.8; }
+  .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #fileInputCamera, #fileInputGallery { display: none; }
+
+  .preview {
+    margin-top: 14px; max-width: 100%; max-height: 200px;
+    border-radius: 10px; object-fit: contain;
+    border: 1px solid #333; display: none;
+  }
+  .status-msg {
+    margin-top: 12px; border-radius: 8px; padding: 10px 14px;
+    font-size: 14px; display: none;
+  }
+  .status-msg.success { background: #1a3a1a; border: 1px solid #4caf5055; color: #a8e6cf; }
+  .status-msg.error   { background: #3a1a1a; border: 1px solid #e74c3c55; color: #ff8a80; }
+  .status-msg.info    { background: #1a2a3a; border: 1px solid #7ec8e355; color: #7ec8e3; }
+  .status-msg.jackpot { background: #2a1f00; border: 1px solid #ffd70066; color: #ffd700; font-weight: 700; font-size: 16px; }
+
+  /* API Key */
+  .apikey-box {
+    background: #16213e; border-radius: 14px; padding: 16px;
+    margin-bottom: 20px; border: 1px solid #ffffff11;
+  }
+  .apikey-box label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .apikey-box input {
+    width: 100%; background: #0f3460; border: 1px solid #333;
+    border-radius: 8px; padding: 10px 12px; color: #fff;
+    font-size: 13px; font-family: monospace;
+  }
+  .apikey-box input:focus { outline: none; border-color: #ffd700; }
+  .apikey-hint { font-size: 11px; color: #555; margin-top: 6px; }
+  .apikey-hint a { color: #7ec8e3; }
+
+  /* Score list */
+  .list-card {
+    background: #16213e; border-radius: 14px;
+    border: 1px solid #ffffff0f; overflow: hidden;
+  }
+  .list-header {
+    display: grid; grid-template-columns: 85px 60px 28px 1fr 32px;
+    padding: 9px 14px; background: #0f3460;
+    font-size: 10px; color: #555; font-weight: 700;
+    text-transform: uppercase; gap: 6px; letter-spacing: 0.5px;
+  }
+  .score-row {
+    display: grid; grid-template-columns: 85px 60px 28px 1fr 32px;
+    padding: 12px 14px; gap: 6px;
+    border-top: 1px solid #ffffff08; align-items: center;
+  }
+  .score-row.is-high { background: #ffd70010; }
+  .score-row.is-jackpot { border-left: 3px solid #ffd700; }
+  .score-row .date { color: #888; font-size: 12px; }
+  .score-row .score { font-weight: 900; font-size: 18px; color: #fff; }
+  .score-row.is-high .score { color: #ffd700; }
+  .jackpot-icon { font-size: 16px; text-align: center; }
+  .score-row .notes { color: #666; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .del-btn {
+    background: none; border: none; color: #e74c3c;
+    cursor: pointer; font-size: 16px; padding: 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .empty-msg { padding: 24px; color: #444; text-align: center; font-size: 14px; }
+
+  /* Manual add */
+  .manual-toggle {
+    background: none; border: 1px solid #ffffff22; border-radius: 8px;
+    color: #666; font-size: 12px; padding: 7px 14px; cursor: pointer;
+    margin-top: 12px; width: 100%; -webkit-tap-highlight-color: transparent;
+  }
+  .manual-form { margin-top: 12px; display: none; }
+  .manual-form.open { display: flex; flex-wrap: wrap; gap: 8px; }
+  .manual-form input, .manual-form select {
+    background: #0f3460; border: 1px solid #333; border-radius: 8px;
+    padding: 9px 12px; color: #fff; font-size: 14px;
+  }
+  .manual-form input:focus, .manual-form select:focus { outline: none; border-color: #ffd700; }
+  .manual-form .f-date { flex: 0 0 130px; }
+  .manual-form .f-score { flex: 0 0 80px; }
+  .manual-form .f-jp { flex: 0 0 auto; }
+  .manual-form .f-notes { flex: 1; min-width: 100px; }
+  .manual-form .f-add {
+    background: #ffd700; color: #0d0d1a; border: none;
+    border-radius: 8px; padding: 9px 18px; font-weight: 800;
+    font-size: 14px; cursor: pointer; flex: 0 0 auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="bird">🐦</div>
+  <h1>FLYING TICKETS</h1>
+  <p>Score Tracker</p>
+</div>
+
+<!-- Jackpot Banner -->
+<div class="jackpot-banner">
+  <div>
+    <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🎰 Jackpot Rate</div>
+    <div class="jackpot-pct" id="jackpotPct">0%</div>
+  </div>
+  <div class="jackpot-right">
+    <div class="jackpot-label">+400 bonus wins</div>
+    <div class="jackpot-counts" id="jackpotCounts">0 of 0 runs</div>
+    <div class="jackpot-streak" id="jackpotStreak"></div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat gold"><div class="val" id="statHigh">0</div><div class="lbl">All-Time High</div></div>
+  <div class="stat blue"><div class="val" id="statSessions">0</div><div class="lbl">Sessions</div></div>
+  <div class="stat green"><div class="val" id="statAvg">0</div><div class="lbl">Average</div></div>
+</div>
+
+<div class="apikey-box">
+  <label>Open Router API Key</label>
+  <input type="password" id="apiKey" placeholder="sk-or-..." autocomplete="off" oninput="saveKey()">
+  <div class="apikey-hint">
+    Get a key at <a href="https://openrouter.ai" target="_blank">openrouter.ai</a> — saved locally on your phone only.
+  </div>
+</div>
+
+<div class="upload-box">
+  <input type="file" id="fileInputCamera" accept="image/*" capture="environment">
+  <input type="file" id="fileInputGallery" accept="image/*">
+  <div class="upload-btn-row">
+    <button class="upload-btn" id="uploadBtnCamera" onclick="document.getElementById('fileInputCamera').click()">
+      📷 Camera
+    </button>
+    <button class="upload-btn" id="uploadBtnGallery" onclick="document.getElementById('fileInputGallery').click()">
+      🖼️ Gallery
+    </button>
+  </div>
+  <img class="preview" id="preview">
+  <div class="status-msg" id="statusMsg"></div>
+
+  <button class="manual-toggle" onclick="toggleManual()">+ Add score manually</button>
+  <div class="manual-form" id="manualForm">
+    <input class="f-date" type="date" id="mDate">
+    <input class="f-score" type="number" id="mScore" placeholder="Score">
+    <select class="f-jp" id="mJackpot">
+      <option value="0">No jackpot</option>
+      <option value="1">🎰 Jackpot!</option>
+    </select>
+    <input class="f-notes" type="text" id="mNotes" placeholder="Notes (optional)">
+    <button class="f-add" onclick="addManual()">Add</button>
+  </div>
+</div>
+
+<div class="list-card">
+  <div class="list-header">
+    <span>Date</span><span>Score</span><span>🎰</span><span>Notes</span><span></span>
+  </div>
+  <div id="scoreList"><div class="empty-msg">No scores yet — take a photo to get started!</div></div>
+</div>
+
+<script>
+const STORAGE_KEY = "ft-scores-v2";
+let scores = [];
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) scores = JSON.parse(raw);
+  } catch {}
+  render();
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(scores));
+  render();
+}
+
+function saveKey() {
+  localStorage.setItem("ft-apikey", document.getElementById("apiKey").value.trim());
+}
+
+function render() {
+  const high = scores.length ? Math.max(...scores.map(s => s.score)) : 0;
+  const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b.score, 0) / scores.length) : 0;
+  const jackpotCount = scores.filter(s => s.jackpot).length;
+  const jackpotPct = scores.length ? Math.round((jackpotCount / scores.length) * 100) : 0;
+
+  document.getElementById("statHigh").textContent = high;
+  document.getElementById("statSessions").textContent = scores.length;
+  document.getElementById("statAvg").textContent = avg;
+  document.getElementById("jackpotPct").textContent = jackpotPct + "%";
+  document.getElementById("jackpotCounts").textContent = jackpotCount + " of " + scores.length + " runs";
+
+  // Streak: count consecutive jackpots or non-jackpots from most recent
+  const sorted = [...scores].sort((a, b) =>
+    a.date === b.date ? b.timestamp - a.timestamp : b.date.localeCompare(a.date)
+  );
+  let streakEl = "";
+  if (sorted.length > 0) {
+    const latest = sorted[0].jackpot;
+    let streak = 0;
+    for (const s of sorted) {
+      if (!!s.jackpot === !!latest) streak++;
+      else break;
+    }
+    if (latest && streak >= 2) streakEl = "🔥 " + streak + " jackpots in a row!";
+    else if (!latest && streak >= 3) streakEl = "😬 " + streak + " runs without jackpot";
+  }
+  document.getElementById("jackpotStreak").textContent = streakEl;
+
+  const list = document.getElementById("scoreList");
+  if (!scores.length) {
+    list.innerHTML = '<div class="empty-msg">No scores yet — take a photo to get started!</div>';
+    return;
+  }
+
+  list.innerHTML = sorted.map(s => {
+    const isHigh = s.score === high && high > 0;
+    const jpClass = s.jackpot ? " is-jackpot" : "";
+    const jpIcon = s.jackpot ? "🎰" : "";
+    const noteText = s.notes || "—";
+    return `<div class="score-row${isHigh ? " is-high" : ""}${jpClass}">
+      <span class="date">${s.date}</span>
+      <span class="score">${s.score}${isHigh ? " 👑" : ""}</span>
+      <span class="jackpot-icon">${jpIcon}</span>
+      <span class="notes">${noteText}</span>
+      <button class="del-btn" onclick="deleteScore(${s.timestamp})">🗑</button>
+    </div>`;
+  }).join("");
+}
+
+function deleteScore(ts) {
+  if (!confirm("Delete this score?")) return;
+  scores = scores.filter(s => s.timestamp !== ts);
+  save();
+}
+
+function toggleManual() {
+  const f = document.getElementById("manualForm");
+  f.classList.toggle("open");
+  if (f.classList.contains("open")) {
+    document.getElementById("mDate").value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+function addManual() {
+  const date = document.getElementById("mDate").value;
+  const score = parseInt(document.getElementById("mScore").value);
+  const jackpot = document.getElementById("mJackpot").value === "1";
+  const notes = document.getElementById("mNotes").value.trim();
+  if (!date || isNaN(score)) { alert("Please enter a date and score."); return; }
+  scores.push({ date, score, jackpot, notes, timestamp: Date.now() });
+  save();
+  document.getElementById("mScore").value = "";
+  document.getElementById("mNotes").value = "";
+  document.getElementById("mJackpot").value = "0";
+  document.getElementById("manualForm").classList.remove("open");
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById("statusMsg");
+  el.textContent = msg;
+  el.className = "status-msg " + type;
+  el.style.display = "block";
+}
+
+async function handleFileUpload(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const apiKey = document.getElementById("apiKey").value.trim() || localStorage.getItem("ft-apikey") || "";
+  if (!apiKey) {
+    showStatus("Please enter your Open Router API key above first.", "error");
+    return;
+  }
+
+  const preview = document.getElementById("preview");
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = "block";
+
+  const uploadBtnCamera = document.getElementById("uploadBtnCamera");
+  const uploadBtnGallery = document.getElementById("uploadBtnGallery");
+  uploadBtnCamera.disabled = true;
+  uploadBtnGallery.disabled = true;
+  uploadBtnCamera.textContent = "⏳ Reading score…";
+  uploadBtnGallery.textContent = "⏳ Reading score…";
+  showStatus("Sending to AI…", "info");
+
+  try {
+    const base64 = await toBase64(file);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const res = await fetch("https://openrouter.ai/api/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + apiKey
+      },
+      body: JSON.stringify({
+        model: "anthropic/claude-sonnet-4-6",
+        max_tokens: 200,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: file.type || "image/jpeg", data: base64 }
+            },
+            {
+              type: "text",
+              text: `Flying Tickets arcade end screen. RESPOND WITH ONLY VALID JSON, NO OTHER TEXT.
+Extract these three values:
+1. score: the large blue number (game result, NOT header highscore)
+2. jackpot: true if "+400" or gold coin icon visible near score; false otherwise
+3. jackpot: true if "+" is on top of the gold ticket icons even if the number after it is completely visible; false otherwise
+4. newHighscore: true if "New Highscore" text appears; false otherwise
+
+Output format (and ONLY this, nothing else):
+{"score": 123, "jackpot": false, "newHighscore": false}`
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || "API error " + res.status);
+    }
+
+    const data = await res.json();
+    const text = data.content?.find(b => b.type === "text")?.text || "";
+    
+    // Try to extract JSON from the response (handles preamble text)
+    let clean = text.replace(/```json|```/g, "").trim();
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (jsonMatch) clean = jsonMatch[0];
+    
+    const parsed = JSON.parse(clean);
+
+    let notes = [];
+    if (parsed.newHighscore) notes.push("🏆 New highscore!");
+    if (parsed.jackpot) notes.push("+400 bonus");
+
+    const entry = {
+      date: today,
+      score: parsed.score,
+      jackpot: parsed.jackpot,
+      notes: notes.join(" "),
+      timestamp: Date.now()
+    };
+
+    scores.push(entry);
+    save();
+
+    if (parsed.jackpot) {
+      showStatus(`🎰 JACKPOT! Score ${parsed.score} +400 bonus saved!`, "jackpot");
+    } else {
+      showStatus(`✅ Score ${parsed.score} saved!${parsed.newHighscore ? " 🏆 New highscore!" : ""}`, "success");
+    }
+
+  } catch (err) {
+    console.error(err);
+    showStatus("❌ " + (err.message || "Couldn't read the score. Try a clearer photo."), "error");
+  }
+
+  uploadBtnCamera.disabled = false;
+  uploadBtnGallery.disabled = false;
+  uploadBtnCamera.textContent = "📷 Camera";
+  uploadBtnGallery.textContent = "🖼️ Gallery";
+  fileInput.value = "";
+}
+
+document.getElementById("fileInputCamera").addEventListener("change", function() {
+  handleFileUpload(this);
+});
+
+document.getElementById("fileInputGallery").addEventListener("change", function() {
+  handleFileUpload(this);
+});
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(",")[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+// Register service worker for PWA support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(err => {
+    console.log('Service worker registration failed:', err);
+  });
+}
+
+window.addEventListener("load", () => {
+  load();
+  const saved = localStorage.getItem("ft-apikey");
+  if (saved) document.getElementById("apiKey").value = saved;
+  document.getElementById("mDate").value = new Date().toISOString().slice(0, 10);
+});
+</script>
+</body>
+</html>
