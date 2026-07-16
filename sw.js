@@ -1,7 +1,7 @@
 const CACHE_NAME = 'flying-tickets-v1';
 const urlsToCache = [
   './',
-  './flying_tickets_tracker.html',
+  './index.html',
   './manifest.json'
 ];
 
@@ -44,7 +44,7 @@ self.addEventListener('fetch', event => {
       }
       return fetch(event.request).catch(() => {
         // Return cached version or offline page
-        return caches.match('./flying_tickets_tracker.html');
+        return caches.match('./index.html');
       });
     })
   );
