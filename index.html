@@ -19,9 +19,37 @@
     padding: 20px 16px 60px;
     max-width: 480px;
     margin: 0 auto;
+    position: relative;
   }
 
-  .header { text-align: center; margin-bottom: 24px; }
+  .header { text-align: center; margin-bottom: 24px; position: relative; }
+
+  .settings-btn {
+    position: absolute; top: -4px; right: 0;
+    background: #16213e; border: 1px solid #ffffff22;
+    border-radius: 10px; width: 40px; height: 40px;
+    font-size: 18px; color: #aaa; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .settings-btn:active { opacity: 0.7; }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: #000000aa;
+    z-index: 100; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: #16213e; border-radius: 14px; padding: 20px;
+    border: 1px solid #ffd70033; width: 100%; max-width: 400px;
+  }
+  .modal-box h2 { font-size: 16px; color: #ffd700; margin-bottom: 14px; letter-spacing: 0.5px; }
+  .modal-close-row { display: flex; justify-content: flex-end; margin-top: 16px; }
+  .modal-close-btn {
+    background: #ffd700; color: #0d0d1a; border: none;
+    border-radius: 8px; padding: 9px 20px; font-weight: 800;
+    font-size: 14px; cursor: pointer;
+  }
   .header .bird { font-size: 48px; margin-bottom: 6px; }
   .header h1 {
     font-size: 26px; font-weight: 900; letter-spacing: 3px;
@@ -170,6 +198,7 @@
 <body>
 
 <div class="header">
+  <button class="settings-btn" onclick="openSettings()" aria-label="Settings">⚙️</button>
   <div class="bird">🐦</div>
   <h1>FLYING TICKETS</h1>
   <p>Score Tracker</p>
@@ -194,11 +223,19 @@
   <div class="stat green"><div class="val" id="statAvg">0</div><div class="lbl">Average</div></div>
 </div>
 
-<div class="apikey-box">
-  <label>Open Router API Key</label>
-  <input type="password" id="apiKey" placeholder="sk-or-..." autocomplete="off" oninput="saveKey()">
-  <div class="apikey-hint">
-    Get a key at <a href="https://openrouter.ai" target="_blank">openrouter.ai</a> — saved locally on your phone only.
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box">
+    <h2>⚙️ Settings</h2>
+    <div class="apikey-box" style="margin-bottom:0;border:none;padding:0;">
+      <label>Open Router API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-or-..." autocomplete="off" oninput="saveKey()">
+      <div class="apikey-hint">
+        Get a key at <a href="https://openrouter.ai" target="_blank">openrouter.ai</a> — saved locally on your phone only.
+      </div>
+    </div>
+    <div class="modal-close-row">
+      <button class="modal-close-btn" onclick="closeSettings()">Done</button>
+    </div>
   </div>
 </div>
 
@@ -256,6 +293,18 @@ function save() {
 function saveKey() {
   localStorage.setItem("ft-apikey", document.getElementById("apiKey").value.trim());
 }
+
+function openSettings() {
+  document.getElementById("settingsModal").classList.add("open");
+}
+
+function closeSettings() {
+  document.getElementById("settingsModal").classList.remove("open");
+}
+
+document.getElementById("settingsModal").addEventListener("click", function(e) {
+  if (e.target === this) closeSettings();
+});
 
 function render() {
   const high = scores.length ? Math.max(...scores.map(s => s.score)) : 0;
@@ -348,7 +397,7 @@ async function handleFileUpload(fileInput) {
 
   const apiKey = document.getElementById("apiKey").value.trim() || localStorage.getItem("ft-apikey") || "";
   if (!apiKey) {
-    showStatus("Please enter your Open Router API key above first.", "error");
+    showStatus("Please add your Open Router API key in Settings (⚙️) first.", "error");
     return;
   }
 
@@ -389,9 +438,8 @@ async function handleFileUpload(fileInput) {
               text: `Flying Tickets arcade end screen. RESPOND WITH ONLY VALID JSON, NO OTHER TEXT.
 Extract these three values:
 1. score: the large blue number (game result, NOT header highscore)
-2. jackpot: true if "+400" or gold coin icon visible near score; false otherwise
-3. jackpot: true if "+" is on top of the gold ticket icons even if the number after it is completely visible; false otherwise
-4. newHighscore: true if "New Highscore" text appears; false otherwise
+2. jackpot: true if "+400", a gold coin icon, or a "+" sitting on top of the gold ticket icons is visible near the score (even if the number after it is fully visible); false otherwise
+3. newHighscore: true if "New Highscore" text appears; false otherwise
 
 Output format (and ONLY this, nothing else):
 {"score": 123, "jackpot": false, "newHighscore": false}`
