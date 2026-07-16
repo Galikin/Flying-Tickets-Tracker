@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flying-tickets-v2';
+const CACHE_NAME = 'flying-tickets-v1';
 const urlsToCache = [
   './',
   './index.html',
