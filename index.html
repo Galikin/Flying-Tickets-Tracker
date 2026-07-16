@@ -147,13 +147,13 @@
     border: 1px solid #ffffff0f; overflow: hidden;
   }
   .list-header {
-    display: grid; grid-template-columns: 85px 60px 28px 1fr 32px;
+    display: grid; grid-template-columns: 76px 52px 24px 1fr 28px 28px;
     padding: 9px 14px; background: #0f3460;
     font-size: 10px; color: #555; font-weight: 700;
     text-transform: uppercase; gap: 6px; letter-spacing: 0.5px;
   }
   .score-row {
-    display: grid; grid-template-columns: 85px 60px 28px 1fr 32px;
+    display: grid; grid-template-columns: 76px 52px 24px 1fr 28px 28px;
     padding: 12px 14px; gap: 6px;
     border-top: 1px solid #ffffff08; align-items: center;
   }
@@ -164,6 +164,11 @@
   .score-row.is-high .score { color: #ffd700; }
   .jackpot-icon { font-size: 16px; text-align: center; }
   .score-row .notes { color: #666; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .edit-btn {
+    background: none; border: none; color: #7ec8e3;
+    cursor: pointer; font-size: 14px; padding: 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
   .del-btn {
     background: none; border: none; color: #e74c3c;
     cursor: pointer; font-size: 16px; padding: 4px;
@@ -233,6 +238,15 @@
         Get a key at <a href="https://openrouter.ai" target="_blank">openrouter.ai</a> — saved locally on your phone only.
       </div>
     </div>
+    <div class="apikey-box" style="margin-top:16px;margin-bottom:0;border:none;padding:16px 0 0;border-top:1px solid #ffffff11;">
+      <label>Backup Data</label>
+      <div style="display:flex;gap:10px;">
+        <button class="modal-close-btn" style="flex:1;background:#0f3460;color:#7ec8e3;" onclick="exportData()">⬇️ Export</button>
+        <button class="modal-close-btn" style="flex:1;background:#0f3460;color:#a8e6cf;" onclick="importData()">⬆️ Import</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+      <div class="apikey-hint">Export saves all scores to a file — keep a copy somewhere safe. Import adds scores from a backup file without duplicating existing ones.</div>
+    </div>
     <div class="modal-close-row">
       <button class="modal-close-btn" onclick="closeSettings()">Done</button>
     </div>
@@ -262,13 +276,13 @@
       <option value="1">🎰 Jackpot!</option>
     </select>
     <input class="f-notes" type="text" id="mNotes" placeholder="Notes (optional)">
-    <button class="f-add" onclick="addManual()">Add</button>
+    <button class="f-add" id="mAddBtn" onclick="addManual()">Add</button>
   </div>
 </div>
 
 <div class="list-card">
   <div class="list-header">
-    <span>Date</span><span>Score</span><span>🎰</span><span>Notes</span><span></span>
+    <span>Date</span><span>Score</span><span>🎰</span><span>Notes</span><span></span><span></span>
   </div>
   <div id="scoreList"><div class="empty-msg">No scores yet — take a photo to get started!</div></div>
 </div>
@@ -276,6 +290,7 @@
 <script>
 const STORAGE_KEY = "ft-scores-v2";
 let scores = [];
+let editingTs = null;
 
 function load() {
   try {
@@ -297,6 +312,56 @@ function saveKey() {
 function openSettings() {
   document.getElementById("settingsModal").classList.add("open");
 }
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(scores, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "flying-tickets-scores-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importData() {
+  document.getElementById("importFile").click();
+}
+
+document.getElementById("importFile").addEventListener("change", function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error("File doesn't contain a list of scores");
+      const existingTs = new Set(scores.map(s => s.timestamp));
+      let added = 0;
+      imported.forEach(item => {
+        if (item && typeof item.score === "number" && item.date && !existingTs.has(item.timestamp)) {
+          const ts = item.timestamp || (Date.now() + added);
+          scores.push({
+            date: item.date,
+            score: item.score,
+            jackpot: !!item.jackpot,
+            notes: item.notes || "",
+            timestamp: ts
+          });
+          existingTs.add(ts);
+          added++;
+        }
+      });
+      save();
+      alert(added + " score(s) imported.");
+    } catch (err) {
+      alert("Couldn't read that file: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  this.value = "";
+});
 
 function closeSettings() {
   document.getElementById("settingsModal").classList.remove("open");
@@ -351,6 +416,7 @@ function render() {
       <span class="score">${s.score}${isHigh ? " 👑" : ""}</span>
       <span class="jackpot-icon">${jpIcon}</span>
       <span class="notes">${noteText}</span>
+      <button class="edit-btn" onclick="editScore(${s.timestamp})">✏️</button>
       <button class="del-btn" onclick="deleteScore(${s.timestamp})">🗑</button>
     </div>`;
   }).join("");
@@ -364,10 +430,31 @@ function deleteScore(ts) {
 
 function toggleManual() {
   const f = document.getElementById("manualForm");
-  f.classList.toggle("open");
   if (f.classList.contains("open")) {
+    f.classList.remove("open");
+    editingTs = null;
+  } else {
+    editingTs = null;
     document.getElementById("mDate").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("mScore").value = "";
+    document.getElementById("mNotes").value = "";
+    document.getElementById("mJackpot").value = "0";
+    document.getElementById("mAddBtn").textContent = "Add";
+    f.classList.add("open");
   }
+}
+
+function editScore(ts) {
+  const s = scores.find(x => x.timestamp === ts);
+  if (!s) return;
+  editingTs = ts;
+  document.getElementById("mDate").value = s.date;
+  document.getElementById("mScore").value = s.score;
+  document.getElementById("mJackpot").value = s.jackpot ? "1" : "0";
+  document.getElementById("mNotes").value = s.notes || "";
+  document.getElementById("mAddBtn").textContent = "Save";
+  document.getElementById("manualForm").classList.add("open");
+  document.getElementById("manualForm").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function addManual() {
@@ -376,11 +463,20 @@ function addManual() {
   const jackpot = document.getElementById("mJackpot").value === "1";
   const notes = document.getElementById("mNotes").value.trim();
   if (!date || isNaN(score)) { alert("Please enter a date and score."); return; }
-  scores.push({ date, score, jackpot, notes, timestamp: Date.now() });
+
+  if (editingTs) {
+    const s = scores.find(x => x.timestamp === editingTs);
+    if (s) { s.date = date; s.score = score; s.jackpot = jackpot; s.notes = notes; }
+    editingTs = null;
+  } else {
+    scores.push({ date, score, jackpot, notes, timestamp: Date.now() });
+  }
+
   save();
   document.getElementById("mScore").value = "";
   document.getElementById("mNotes").value = "";
   document.getElementById("mJackpot").value = "0";
+  document.getElementById("mAddBtn").textContent = "Add";
   document.getElementById("manualForm").classList.remove("open");
 }
 
