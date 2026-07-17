@@ -1,3 +1,4 @@
+// This is a comment
 const CACHE_NAME = 'flying-tickets-v1';
 const urlsToCache = [
   './',
