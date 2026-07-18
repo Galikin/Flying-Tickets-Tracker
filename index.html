@@ -112,6 +112,20 @@
   .ver-tag.ver-v1 { background: #7ec8e322; color: #7ec8e3; }
   .ver-tag.ver-v2 { background: #ffd70022; color: #ffd700; }
 
+  /* Monthly stats view */
+  .month-card {
+    background: #16213e; border-radius: 14px; border: 1px solid #ffffff0f;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .month-card h3 {
+    font-size: 14px; color: #ffd700; margin-bottom: 10px; letter-spacing: 0.5px;
+  }
+  .month-card h3 .count { color: #666; font-weight: 400; font-size: 11px; }
+  .month-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .month-stat { background: #0f3460; border-radius: 10px; padding: 10px; text-align: center; }
+  .month-stat .mval { font-size: 18px; font-weight: 900; color: #fff; }
+  .month-stat .mlbl { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
   /* Upload */
   .upload-box {
     background: #16213e; border-radius: 14px; padding: 20px;
@@ -222,6 +236,7 @@
 <body>
 
 <div class="header">
+  <button class="settings-btn" style="right:96px;" onclick="openMonthly()" aria-label="Monthly averages">📅</button>
   <button class="settings-btn" style="right:48px;" onclick="openChart()" aria-label="Score chart">📈</button>
   <button class="settings-btn" onclick="openSettings()" aria-label="Settings">⚙️</button>
   <div class="bird">🐦</div>
@@ -299,6 +314,21 @@
     </div>
     <div class="modal-close-row" style="justify-content:center;margin-top:14px;">
       <button class="manual-toggle" style="width:auto;padding:8px 16px;" onclick="cancelPhotoEntry()">Discard this reading</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="monthlyModal">
+  <div class="modal-box" style="max-width:460px;">
+    <h2>📅 Monthly Averages</h2>
+    <div class="version-filter" id="monthlyVersionFilter" style="margin-bottom:14px;">
+      <button class="vf-btn active" data-ver="all" onclick="setMonthlyVersionFilter('all')">All</button>
+      <button class="vf-btn" data-ver="v1" onclick="setMonthlyVersionFilter('v1')">V1</button>
+      <button class="vf-btn" data-ver="v2" onclick="setMonthlyVersionFilter('v2')">V2</button>
+    </div>
+    <div id="monthlyContainer"></div>
+    <div class="modal-close-row">
+      <button class="modal-close-btn" onclick="closeMonthly()">Done</button>
     </div>
   </div>
 </div>
@@ -409,6 +439,70 @@ document.getElementById("chartModal").addEventListener("click", function(e) {
   if (e.target === this) closeChart();
 });
 
+let monthlyVersionFilter = "all";
+
+function openMonthly() {
+  renderMonthly();
+  document.getElementById("monthlyModal").classList.add("open");
+}
+
+function closeMonthly() {
+  document.getElementById("monthlyModal").classList.remove("open");
+}
+
+document.getElementById("monthlyModal").addEventListener("click", function(e) {
+  if (e.target === this) closeMonthly();
+});
+
+function setMonthlyVersionFilter(v) {
+  monthlyVersionFilter = v;
+  document.querySelectorAll("#monthlyModal .vf-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.ver === v);
+  });
+  renderMonthly();
+}
+
+function renderMonthly() {
+  const list = monthlyVersionFilter === "all"
+    ? scores
+    : scores.filter(s => (s.version || "v2") === monthlyVersionFilter);
+
+  const container = document.getElementById("monthlyContainer");
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-msg">No scores yet for this filter.</div>';
+    return;
+  }
+
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const groups = {};
+  list.forEach(s => {
+    const key = s.date.slice(0, 7);
+    (groups[key] = groups[key] || []).push(s);
+  });
+
+  const monthKeys = Object.keys(groups).sort().reverse();
+
+  container.innerHTML = monthKeys.map(key => {
+    const runs = groups[key];
+    const [y, m] = key.split("-");
+    const label = monthNames[parseInt(m, 10) - 1] + " " + y;
+    const high = Math.max(...runs.map(s => s.score));
+    const low = Math.min(...runs.map(s => s.score));
+    const avg = Math.round(runs.reduce((a, b) => a + b.score, 0) / runs.length);
+    const jackpotPct = Math.round((runs.filter(s => s.jackpot).length / runs.length) * 100);
+
+    return `<div class="month-card">
+      <h3>${label} <span class="count">(${runs.length} run${runs.length === 1 ? "" : "s"})</span></h3>
+      <div class="month-stats">
+        <div class="month-stat"><div class="mval">${jackpotPct}%</div><div class="mlbl">Jackpot Avg</div></div>
+        <div class="month-stat"><div class="mval">${high}</div><div class="mlbl">High Score</div></div>
+        <div class="month-stat"><div class="mval">${low}</div><div class="mlbl">Low Score</div></div>
+        <div class="month-stat"><div class="mval">${avg}</div><div class="mlbl">Average Score</div></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 function buildChartSVG(list) {
   const sorted = [...list].sort((a, b) =>
     a.date === b.date ? a.timestamp - b.timestamp : a.date.localeCompare(b.date)
@@ -494,6 +588,7 @@ document.getElementById("importFile").addEventListener("change", function() {
             date: item.date,
             score: item.score,
             jackpot: !!item.jackpot,
+            version: item.version === "v1" ? "v1" : "v2",
             notes: item.notes || "",
             timestamp: ts
           });
