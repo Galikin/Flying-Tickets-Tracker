@@ -93,6 +93,25 @@
   .stat.green .val { color: #a8e6cf; }
   .stat .lbl { font-size: 9px; color: #555; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
 
+  /* Version filter */
+  .version-filter { display: flex; gap: 6px; margin-bottom: 16px; }
+  .vf-btn {
+    flex: 1; background: #16213e; border: 1px solid #ffffff15;
+    color: #888; padding: 9px; border-radius: 10px; font-size: 12px;
+    font-weight: 800; cursor: pointer; letter-spacing: 0.5px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .vf-btn.active { background: #ffd700; color: #0d0d1a; border-color: #ffd700; }
+
+  /* Version tag badge (shown in score rows) */
+  .ver-tag {
+    display: inline-block; font-size: 9px; font-weight: 800;
+    padding: 1px 5px; border-radius: 4px; margin-top: 3px;
+    letter-spacing: 0.3px;
+  }
+  .ver-tag.ver-v1 { background: #7ec8e322; color: #7ec8e3; }
+  .ver-tag.ver-v2 { background: #ffd70022; color: #ffd700; }
+
   /* Upload */
   .upload-box {
     background: #16213e; border-radius: 14px; padding: 20px;
@@ -159,7 +178,7 @@
   }
   .score-row.is-high { background: #ffd70010; }
   .score-row.is-jackpot { border-left: 3px solid #ffd700; }
-  .score-row .date { color: #888; font-size: 12px; }
+  .score-row .date { color: #888; font-size: 12px; display: flex; flex-direction: column; align-items: flex-start; }
   .score-row .score { font-weight: 900; font-size: 18px; color: #fff; }
   .score-row.is-high .score { color: #ffd700; }
   .jackpot-icon { font-size: 16px; text-align: center; }
@@ -223,6 +242,12 @@
   </div>
 </div>
 
+<div class="version-filter" id="versionFilter">
+  <button class="vf-btn active" data-ver="all" onclick="setVersionFilter('all')">All</button>
+  <button class="vf-btn" data-ver="v1" onclick="setVersionFilter('v1')">V1</button>
+  <button class="vf-btn" data-ver="v2" onclick="setVersionFilter('v2')">V2</button>
+</div>
+
 <div class="stats">
   <div class="stat gold"><div class="val" id="statHigh">0</div><div class="lbl">All-Time High</div></div>
   <div class="stat blue"><div class="val" id="statSessions">0</div><div class="lbl">Sessions</div></div>
@@ -264,6 +289,20 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="versionPromptModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h2>🕹️ Which machine?</h2>
+    <div id="versionPromptSummary" style="color:#ccc;font-size:14px;margin-bottom:16px;"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="modal-close-btn" style="background:#7ec8e3;width:100%;" onclick="confirmPhotoVersion('v1')">V1 — No moving pipes</button>
+      <button class="modal-close-btn" style="background:#ffd700;width:100%;" onclick="confirmPhotoVersion('v2')">V2 — Moving pipes</button>
+    </div>
+    <div class="modal-close-row" style="justify-content:center;margin-top:14px;">
+      <button class="manual-toggle" style="width:auto;padding:8px 16px;" onclick="cancelPhotoEntry()">Discard this reading</button>
+    </div>
+  </div>
+</div>
+
 <div class="upload-box">
   <input type="file" id="fileInputCamera" accept="image/*" capture="environment">
   <input type="file" id="fileInputGallery" accept="image/*">
@@ -286,6 +325,10 @@
       <option value="0">No jackpot</option>
       <option value="1">🎰 Jackpot!</option>
     </select>
+    <select class="f-jp" id="mVersion">
+      <option value="v1">V1 (no moving pipes)</option>
+      <option value="v2" selected>V2 (moving pipes)</option>
+    </select>
     <input class="f-notes" type="text" id="mNotes" placeholder="Notes (optional)">
     <button class="f-add" id="mAddBtn" onclick="addManual()">Add</button>
   </div>
@@ -302,13 +345,42 @@
 const STORAGE_KEY = "ft-scores-v2";
 let scores = [];
 let editingTs = null;
+let versionFilter = "all";
+let pendingPhotoEntry = null;
+
+function setVersionFilter(v) {
+  versionFilter = v;
+  document.querySelectorAll(".vf-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.ver === v);
+  });
+  render();
+}
+
+function getFilteredScores() {
+  if (versionFilter === "all") return scores;
+  return scores.filter(s => (s.version || "v2") === versionFilter);
+}
 
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) scores = JSON.parse(raw);
   } catch {}
+  migrateVersions();
   render();
+}
+
+function migrateVersions() {
+  let changed = false;
+  scores.forEach(s => {
+    if (!s.version) {
+      s.version = "v2";
+      changed = true;
+    }
+  });
+  if (changed) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(scores));
+  }
 }
 
 function save() {
@@ -325,7 +397,7 @@ function openSettings() {
 }
 
 function openChart() {
-  document.getElementById("chartContainer").innerHTML = buildChartSVG();
+  document.getElementById("chartContainer").innerHTML = buildChartSVG(getFilteredScores());
   document.getElementById("chartModal").classList.add("open");
 }
 
@@ -337,8 +409,8 @@ document.getElementById("chartModal").addEventListener("click", function(e) {
   if (e.target === this) closeChart();
 });
 
-function buildChartSVG() {
-  const sorted = [...scores].sort((a, b) =>
+function buildChartSVG(list) {
+  const sorted = [...list].sort((a, b) =>
     a.date === b.date ? a.timestamp - b.timestamp : a.date.localeCompare(b.date)
   );
   if (!sorted.length) {
@@ -447,20 +519,25 @@ document.getElementById("settingsModal").addEventListener("click", function(e) {
   if (e.target === this) closeSettings();
 });
 
+document.getElementById("versionPromptModal").addEventListener("click", function(e) {
+  if (e.target === this) cancelPhotoEntry();
+});
+
 function render() {
-  const high = scores.length ? Math.max(...scores.map(s => s.score)) : 0;
-  const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b.score, 0) / scores.length) : 0;
-  const jackpotCount = scores.filter(s => s.jackpot).length;
-  const jackpotPct = scores.length ? Math.round((jackpotCount / scores.length) * 100) : 0;
+  const filtered = getFilteredScores();
+  const high = filtered.length ? Math.max(...filtered.map(s => s.score)) : 0;
+  const avg = filtered.length ? Math.round(filtered.reduce((a, b) => a + b.score, 0) / filtered.length) : 0;
+  const jackpotCount = filtered.filter(s => s.jackpot).length;
+  const jackpotPct = filtered.length ? Math.round((jackpotCount / filtered.length) * 100) : 0;
 
   document.getElementById("statHigh").textContent = high;
-  document.getElementById("statSessions").textContent = scores.length;
+  document.getElementById("statSessions").textContent = filtered.length;
   document.getElementById("statAvg").textContent = avg;
   document.getElementById("jackpotPct").textContent = jackpotPct + "%";
-  document.getElementById("jackpotCounts").textContent = jackpotCount + " of " + scores.length + " runs";
+  document.getElementById("jackpotCounts").textContent = jackpotCount + " of " + filtered.length + " runs";
 
   // Streak: count consecutive jackpots or non-jackpots from most recent
-  const sorted = [...scores].sort((a, b) =>
+  const sorted = [...filtered].sort((a, b) =>
     a.date === b.date ? b.timestamp - a.timestamp : b.date.localeCompare(a.date)
   );
   let streakEl = "";
@@ -477,7 +554,7 @@ function render() {
   document.getElementById("jackpotStreak").textContent = streakEl;
 
   const list = document.getElementById("scoreList");
-  if (!scores.length) {
+  if (!filtered.length) {
     list.innerHTML = '<div class="empty-msg">No scores yet — take a photo to get started!</div>';
     return;
   }
@@ -487,8 +564,9 @@ function render() {
     const jpClass = s.jackpot ? " is-jackpot" : "";
     const jpIcon = s.jackpot ? "🎰" : "";
     const noteText = s.notes || "—";
+    const ver = s.version || "v2";
     return `<div class="score-row${isHigh ? " is-high" : ""}${jpClass}">
-      <span class="date">${s.date}</span>
+      <span class="date">${s.date}<span class="ver-tag ver-${ver}">${ver.toUpperCase()}</span></span>
       <span class="score">${s.score}${isHigh ? " 👑" : ""}</span>
       <span class="jackpot-icon">${jpIcon}</span>
       <span class="notes">${noteText}</span>
@@ -515,6 +593,7 @@ function toggleManual() {
     document.getElementById("mScore").value = "";
     document.getElementById("mNotes").value = "";
     document.getElementById("mJackpot").value = "0";
+    document.getElementById("mVersion").value = "v2";
     document.getElementById("mAddBtn").textContent = "Add";
     f.classList.add("open");
   }
@@ -527,6 +606,7 @@ function editScore(ts) {
   document.getElementById("mDate").value = s.date;
   document.getElementById("mScore").value = s.score;
   document.getElementById("mJackpot").value = s.jackpot ? "1" : "0";
+  document.getElementById("mVersion").value = s.version || "v2";
   document.getElementById("mNotes").value = s.notes || "";
   document.getElementById("mAddBtn").textContent = "Save";
   document.getElementById("manualForm").classList.add("open");
@@ -537,21 +617,23 @@ function addManual() {
   const date = document.getElementById("mDate").value;
   const score = parseInt(document.getElementById("mScore").value);
   const jackpot = document.getElementById("mJackpot").value === "1";
+  const version = document.getElementById("mVersion").value || "v2";
   const notes = document.getElementById("mNotes").value.trim();
   if (!date || isNaN(score)) { alert("Please enter a date and score."); return; }
 
   if (editingTs) {
     const s = scores.find(x => x.timestamp === editingTs);
-    if (s) { s.date = date; s.score = score; s.jackpot = jackpot; s.notes = notes; }
+    if (s) { s.date = date; s.score = score; s.jackpot = jackpot; s.version = version; s.notes = notes; }
     editingTs = null;
   } else {
-    scores.push({ date, score, jackpot, notes, timestamp: Date.now() });
+    scores.push({ date, score, jackpot, version, notes, timestamp: Date.now() });
   }
 
   save();
   document.getElementById("mScore").value = "";
   document.getElementById("mNotes").value = "";
   document.getElementById("mJackpot").value = "0";
+  document.getElementById("mVersion").value = "v2";
   document.getElementById("mAddBtn").textContent = "Add";
   document.getElementById("manualForm").classList.remove("open");
 }
@@ -640,33 +722,75 @@ Output format (and ONLY this, nothing else):
     if (parsed.newHighscore) notes.push("🏆 New highscore!");
     if (parsed.jackpot) notes.push("+400 bonus");
 
-    const entry = {
+    pendingPhotoEntry = {
       date: today,
       score: parsed.score,
       jackpot: parsed.jackpot,
+      newHighscore: parsed.newHighscore,
       notes: notes.join(" "),
       timestamp: Date.now()
     };
 
-    scores.push(entry);
-    save();
-
-    if (parsed.jackpot) {
-      showStatus(`🎰 JACKPOT! Score ${parsed.score} +400 bonus saved!`, "jackpot");
-    } else {
-      showStatus(`✅ Score ${parsed.score} saved!${parsed.newHighscore ? " 🏆 New highscore!" : ""}`, "success");
-    }
+    uploadBtnCamera.textContent = "👇 Pick version below";
+    uploadBtnGallery.textContent = "👇 Pick version below";
+    showStatus(`Read score ${parsed.score} — confirm which machine.`, "info");
+    showVersionPrompt(parsed);
+    fileInput.value = "";
+    return;
 
   } catch (err) {
     console.error(err);
     showStatus("❌ " + (err.message || "Couldn't read the score. Try a clearer photo."), "error");
   }
 
+  resetUploadButtons();
+  fileInput.value = "";
+}
+
+function resetUploadButtons() {
+  const uploadBtnCamera = document.getElementById("uploadBtnCamera");
+  const uploadBtnGallery = document.getElementById("uploadBtnGallery");
   uploadBtnCamera.disabled = false;
   uploadBtnGallery.disabled = false;
   uploadBtnCamera.textContent = "📷 Camera";
   uploadBtnGallery.textContent = "🖼️ Gallery";
-  fileInput.value = "";
+}
+
+function showVersionPrompt(parsed) {
+  const summary = document.getElementById("versionPromptSummary");
+  let bits = [`Score: <strong style="color:#ffd700;">${parsed.score}</strong>`];
+  if (parsed.jackpot) bits.push("🎰 +400 jackpot");
+  if (parsed.newHighscore) bits.push("🏆 New highscore");
+  summary.innerHTML = bits.join(" &nbsp;·&nbsp; ");
+  document.getElementById("versionPromptModal").classList.add("open");
+}
+
+function confirmPhotoVersion(version) {
+  if (!pendingPhotoEntry) return;
+  const entry = { ...pendingPhotoEntry, version };
+  const wasHighscore = entry.newHighscore;
+  delete entry.newHighscore;
+
+  scores.push(entry);
+  save();
+
+  document.getElementById("versionPromptModal").classList.remove("open");
+
+  if (entry.jackpot) {
+    showStatus(`🎰 JACKPOT! Score ${entry.score} +400 bonus saved! (${version.toUpperCase()})`, "jackpot");
+  } else {
+    showStatus(`✅ Score ${entry.score} saved! (${version.toUpperCase()})${wasHighscore ? " 🏆 New highscore!" : ""}`, "success");
+  }
+
+  pendingPhotoEntry = null;
+  resetUploadButtons();
+}
+
+function cancelPhotoEntry() {
+  pendingPhotoEntry = null;
+  document.getElementById("versionPromptModal").classList.remove("open");
+  showStatus("Reading discarded — take another photo when ready.", "info");
+  resetUploadButtons();
 }
 
 document.getElementById("fileInputCamera").addEventListener("change", function() {
