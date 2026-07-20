@@ -1,3 +1,4 @@
+// Added in jackpot streak tracking all time highest
 const CACHE_NAME = 'flying-tickets-v1';
 const urlsToCache = [
   './',
