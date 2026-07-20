@@ -77,6 +77,7 @@
   .jackpot-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
   .jackpot-counts { font-size: 13px; color: #ffd70099; }
   .jackpot-streak { font-size: 11px; color: #ff9500; margin-top: 4px; }
+  .jackpot-best { font-size: 11px; color: #ffd700aa; margin-top: 2px; }
 
   /* Stats row */
   .stats { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
@@ -254,6 +255,7 @@
     <div class="jackpot-label">+400 bonus wins</div>
     <div class="jackpot-counts" id="jackpotCounts">0 of 0 runs</div>
     <div class="jackpot-streak" id="jackpotStreak"></div>
+    <div class="jackpot-best" id="jackpotBest"></div>
   </div>
 </div>
 
@@ -647,6 +649,21 @@ function render() {
     else if (!latest && streak >= 3) streakEl = "😬 " + streak + " runs without jackpot";
   }
   document.getElementById("jackpotStreak").textContent = streakEl;
+
+  // Longest jackpot streak ever (within the current version filter), scanning oldest to newest
+  const chronological = [...filtered].sort((a, b) =>
+    a.date === b.date ? a.timestamp - b.timestamp : a.date.localeCompare(b.date)
+  );
+  let bestStreak = 0, runningStreak = 0;
+  for (const s of chronological) {
+    if (s.jackpot) {
+      runningStreak++;
+      if (runningStreak > bestStreak) bestStreak = runningStreak;
+    } else {
+      runningStreak = 0;
+    }
+  }
+  document.getElementById("jackpotBest").textContent = bestStreak >= 2 ? "🏅 Best: " + bestStreak + " in a row" : "";
 
   const list = document.getElementById("scoreList");
   if (!filtered.length) {
