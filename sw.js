@@ -1,4 +1,4 @@
-// Added in jackpot streak tracking all time highest. Adding this to try and force a sync.
+// Added in changing default version that the app loads on
 const CACHE_NAME = 'flying-tickets-v1';
 const urlsToCache = [
   './',
