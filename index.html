@@ -300,6 +300,15 @@
       <input type="file" id="importFile" accept="application/json" style="display:none">
       <div class="apikey-hint">Export saves all scores to a file — keep a copy somewhere safe. Import adds scores from a backup file without duplicating existing ones.</div>
     </div>
+    <div class="apikey-box" style="margin-top:16px;margin-bottom:0;border:none;padding:16px 0 0;border-top:1px solid #ffffff11;">
+      <label>Default Version</label>
+      <div class="version-filter" id="defaultVersionFilter" style="margin-bottom:0;">
+        <button class="vf-btn" data-ver="all" onclick="setDefaultVersion('all')">All</button>
+        <button class="vf-btn" data-ver="v1" onclick="setDefaultVersion('v1')">V1</button>
+        <button class="vf-btn" data-ver="v2" onclick="setDefaultVersion('v2')">V2</button>
+      </div>
+      <div class="apikey-hint">Sets which version filter is selected when you open the app.</div>
+    </div>
     <div class="modal-close-row">
       <button class="modal-close-btn" onclick="closeSettings()">Done</button>
     </div>
@@ -375,6 +384,7 @@
 
 <script>
 const STORAGE_KEY = "ft-scores-v2";
+const DEFAULT_VERSION_KEY = "ft-default-version";
 let scores = [];
 let editingTs = null;
 let versionFilter = "all";
@@ -382,7 +392,7 @@ let pendingPhotoEntry = null;
 
 function setVersionFilter(v) {
   versionFilter = v;
-  document.querySelectorAll(".vf-btn").forEach(btn => {
+  document.querySelectorAll("#versionFilter .vf-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.ver === v);
   });
   render();
@@ -393,12 +403,33 @@ function getFilteredScores() {
   return scores.filter(s => (s.version || "v2") === versionFilter);
 }
 
+function getDefaultVersion() {
+  const v = localStorage.getItem(DEFAULT_VERSION_KEY);
+  return (v === "v1" || v === "v2") ? v : "all";
+}
+
+function setDefaultVersion(v) {
+  localStorage.setItem(DEFAULT_VERSION_KEY, v);
+  document.querySelectorAll("#defaultVersionFilter .vf-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.ver === v);
+  });
+  setVersionFilter(v);
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) scores = JSON.parse(raw);
   } catch {}
   migrateVersions();
+  const defaultVersion = getDefaultVersion();
+  versionFilter = defaultVersion;
+  document.querySelectorAll("#versionFilter .vf-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.ver === defaultVersion);
+  });
+  document.querySelectorAll("#defaultVersionFilter .vf-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.ver === defaultVersion);
+  });
   render();
 }
 
